@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"flag"
+	"log"
 	"os"
 	"strconv"
 	"strings"
@@ -19,15 +20,31 @@ func readLine() string {
 func main() {
 	var lock sync.Mutex
 	var server string
+	var compress bool
+	var logfile string
 	var metrics []*Metric
 	var cpuTemp int = 0
 	var cpuTempClock int64 = 0
 
-	flag.StringVar(&server, "s", "127.0.0.1:10051", "zabbix server address")
+	flag.StringVar(&server, "s", "127.0.0.1:10051", "zabbix server")
+	flag.BoolVar(&compress, "c", false, "compress protocol")
+	flag.StringVar(&logfile, "l", "", "log server response into file")
 	flag.Parse()
 
+	if len(logfile) > 0 {
+		if logfile != "stdout" {
+			f, err := os.OpenFile(logfile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+			if err != nil {
+				log.Fatalf("error opening file: %v", err)
+			}
+			defer f.Close()
+			log.SetOutput(f)
+		}
+		log.SetFlags(log.Ldate | log.Ltime | log.Lmicroseconds | log.Lshortfile)
+	}
+
 	hostname, _ := os.Hostname()
-	packet := NewPacket(metrics, time.Now().Unix())
+	packet := NewPacket(compress, metrics, time.Now().Unix())
 
 	go func() {
 		for {
@@ -43,7 +60,14 @@ func main() {
 			metrics = metrics[:0]
 			lock.Unlock()
 
-			ZabbixSend(server, packet)
+			resp, err := ZabbixSend(server, packet)
+			if len(logfile) > 0 {
+				if err != nil {
+					log.Println(err)
+				} else if resp != nil {
+					log.Println(string(resp))
+				}
+			}
 		}
 	}()
 
