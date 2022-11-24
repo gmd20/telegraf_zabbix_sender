@@ -11,12 +11,6 @@ import (
 	"time"
 )
 
-func readLine() string {
-	reader := bufio.NewReader(os.Stdin)
-	l, _ := reader.ReadString('\n')
-	return l
-}
-
 func main() {
 	var lock sync.Mutex
 	var server string
@@ -27,8 +21,8 @@ func main() {
 	var cpuTempClock string
 
 	flag.StringVar(&server, "s", "127.0.0.1:10051", "zabbix server address")
-	flag.BoolVar(&compress, "c", false, "set true to enable compress protocol")
-	flag.StringVar(&logfile, "l", "", "log server response into file")
+	flag.BoolVar(&compress, "c", false, "use compress protocol(default: false)")
+	flag.StringVar(&logfile, "l", "", "write debug log into file")
 	flag.Parse()
 
 	if len(logfile) > 0 {
@@ -54,9 +48,13 @@ func main() {
 				metrics = append(metrics, NewMetric(hostname, "cpu.temp", strconv.Itoa(cpuTemp), cpuTempClock))
 				cpuTemp = 0
 			}
-			if len(metrics) > 0 {
-				packet.AddMetrics(metrics, time.Now().Unix())
+			if len(metrics) == 0 {
+				lock.Unlock()
+				continue
+			} else if len(logfile) > 0 {
+				log.Println("metrics:", len(metrics))
 			}
+			packet.AddMetrics(metrics, time.Now().Unix())
 			metrics = metrics[:0]
 			lock.Unlock()
 
@@ -71,8 +69,16 @@ func main() {
 		}
 	}()
 
+	reader := bufio.NewReader(os.Stdin)
 	for {
-		line := readLine()
+		line, err := reader.ReadString('\n')
+		if err != nil { // often  io.EOF
+			return
+		}
+		if len(logfile) > 0 {
+			log.Print(line)
+		}
+
 		f := strings.Fields(line)
 		if len(f) != 3 {
 			continue
