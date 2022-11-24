@@ -19,12 +19,11 @@ type Metric struct {
 	Host  string `json:"host"`
 	Key   string `json:"key"`
 	Value string `json:"value"`
-	Clock int64  `json:"clock"`
+	Clock string `json:"clock"`
 }
 
-func NewMetric(host, key, value string, clock int64) *Metric {
-	m := &Metric{Host: host, Key: key, Value: value}
-	m.Clock = clock
+func NewMetric(host, key, value string, clock string) *Metric {
+	m := &Metric{Host: host, Key: key, Value: value, Clock: clock}
 	return m
 }
 
@@ -151,7 +150,7 @@ func zabbixRecv(conn net.Conn) ([]byte, error) {
 
 	for total < int(expectedSize) {
 		n, err := conn.Read(s[total:])
-		if err != nil {
+		if err != nil && err != io.EOF {
 			return nil, fmt.Errorf("Cannot read message: '%s'", err)
 		}
 		if n == 0 {

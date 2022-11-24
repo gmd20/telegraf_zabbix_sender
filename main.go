@@ -24,10 +24,10 @@ func main() {
 	var logfile string
 	var metrics []*Metric
 	var cpuTemp int = 0
-	var cpuTempClock int64 = 0
+	var cpuTempClock string
 
-	flag.StringVar(&server, "s", "127.0.0.1:10051", "zabbix server")
-	flag.BoolVar(&compress, "c", false, "compress protocol")
+	flag.StringVar(&server, "s", "127.0.0.1:10051", "zabbix server address")
+	flag.BoolVar(&compress, "c", false, "set true to enable compress protocol")
 	flag.StringVar(&logfile, "l", "", "log server response into file")
 	flag.Parse()
 
@@ -77,16 +77,17 @@ func main() {
 		if len(f) != 3 {
 			continue
 		}
+		clock := f[2]
 
 		lock.Lock()
 		if f[0] == "temp.temp" { // duplicated name for each cpu cores
 			t, err := strconv.Atoi(f[1])
 			if err == nil && t > cpuTemp {
 				cpuTemp = t
-				cpuTempClock = time.Now().Unix()
+				cpuTempClock = clock
 			}
 		} else {
-			metrics = append(metrics, NewMetric(hostname, f[0], f[1], time.Now().Unix()))
+			metrics = append(metrics, NewMetric(hostname, f[0], f[1], clock))
 		}
 		lock.Unlock()
 	}
